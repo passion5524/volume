@@ -1,0 +1,242 @@
+import React, { useState, useEffect } from 'react';
+import { Box, Triangle, Circle, RotateCcw, ArrowRight } from 'lucide-react';
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('cylinder');
+  const [step, setStep] = useState(0);
+  const [formulaVisible, setFormulaVisible] = useState(false);
+  const [layers, setLayers] = useState(0);
+
+  // 탭 변경 시 모든 상태 초기화
+  useEffect(() => {
+    setStep(0);
+    setFormulaVisible(false);
+    setLayers(0);
+  }, [activeTab]);
+
+  // 원기둥 쌓기 애니메이션: 최상단까지 꽉 차도록 레이어 계산 개선
+  useEffect(() => {
+    let interval;
+    if (step === 1) {
+      setLayers(0);
+      const targetLayers = 20; 
+      interval = setInterval(() => {
+        setLayers(prev => {
+          if (prev >= targetLayers) {
+            clearInterval(interval);
+            return targetLayers;
+          }
+          return prev + 1;
+        });
+      }, 50);
+    }
+    return () => clearInterval(interval);
+  }, [step]);
+
+  // 공통 원기둥 골격 렌더링
+  const renderCylinderSkeleton = (opacity = 0.2, height = 120, yOffset = 100) => {
+    const halfH = height / 2;
+    const topY = yOffset - halfH;
+    const bottomY = yOffset + halfH;
+    return (
+      <g opacity={opacity} stroke="#94a3b8" strokeWidth="1.5">
+        <ellipse cx="100" cy={topY} rx="60" ry="20" fill="none" />
+        <line x1="40" y1={topY} x2="40" y2={bottomY} />
+        <line x1="160" y1={topY} x2="160" y2={bottomY} />
+        <ellipse cx="100" cy={bottomY} rx="60" ry="20" fill="none" />
+      </g>
+    );
+  };
+
+  // 원기둥 내부 채우기 애니메이션
+  const renderVolumeFill = (color, height = 120, yOffset = 100) => {
+    const halfH = height / 2;
+    const bottomY = yOffset + halfH;
+    const topY = yOffset - halfH;
+    const stepDist = height / 20;
+    
+    return (
+      <g>
+        {Array.from({ length: layers }).map((_, i) => (
+          <ellipse 
+            key={i} 
+            cx="100" 
+            cy={bottomY - (i * stepDist)} 
+            rx="60" 
+            ry="20" 
+            fill={color} 
+            fillOpacity="0.15" 
+            stroke={color} 
+            strokeOpacity="0.2"
+          />
+        ))}
+        {layers === 20 && (
+          <g>
+            <ellipse cx="100" cy={topY} rx="60" ry="20" fill={color} fillOpacity="0.4" stroke={color} />
+            <rect x="40" y={topY} width="120" height={height} fill={color} fillOpacity="0.15" />
+            <ellipse cx="100" cy={bottomY} rx="60" ry="20" fill={color} fillOpacity="0.5" stroke={color} />
+          </g>
+        )}
+      </g>
+    );
+  };
+
+  // 분수 UI 컴포넌트
+  const Fraction = ({ numerator, denominator }) => (
+    <div className="inline-flex flex-col items-center align-middle mx-1">
+      <div className="px-1 border-b-2 border-current leading-none pb-0.5">{numerator}</div>
+      <div className="px-1 leading-none pt-0.5">{denominator}</div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-slate-100 p-4 font-sans">
+      <header className="bg-white rounded-2xl p-6 shadow-sm mb-6 border border-slate-200 text-center">
+        <h1 className="text-2xl font-bold text-slate-800">도형의 부피 원리</h1>
+        <p className="text-slate-500 text-sm mt-1">원기둥을 기준으로 부피의 관계를 알아봅시다.</p>
+      </header>
+
+      {/* 탭 메뉴 */}
+      <div className="flex bg-white rounded-xl p-1 shadow-sm mb-6 border border-slate-200">
+        <button onClick={() => setActiveTab('cylinder')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all ${activeTab === 'cylinder' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}><Box size={18} /> 원기둥</button>
+        <button onClick={() => setActiveTab('cone')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all ${activeTab === 'cone' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}><Triangle size={18} /> 원뿔</button>
+        <button onClick={() => setActiveTab('sphere')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all ${activeTab === 'sphere' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}><Circle size={18} /> 구</button>
+      </div>
+
+      {/* 애니메이션 뷰포트 */}
+      <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200 relative">
+        <div className="relative w-full h-72 flex items-center justify-center bg-slate-50 rounded-xl overflow-hidden border border-slate-200">
+          <svg viewBox="0 0 200 200" className="w-full h-full">
+            {activeTab === 'cylinder' && (
+              <>
+                {renderCylinderSkeleton(0.2, 120, 100)}
+                {step >= 1 && renderVolumeFill("#3b82f6", 120, 100)}
+              </>
+            )}
+
+            {activeTab === 'cone' && (
+              <>
+                {renderCylinderSkeleton(step >= 2 ? 0.1 : 0.2, 120, 100)}
+                {step === 1 && renderVolumeFill("#94a3b8", 120, 100)}
+                {step >= 2 && (
+                  <g className="animate-in fade-in duration-1000">
+                    <path d="M40 160 L100 40 L160 160 Q100 185 40 160" fill="#10b981" fillOpacity="0.7" stroke="#059669" strokeWidth="2" />
+                    <ellipse cx="100" cy="160" rx="60" ry="20" fill="none" stroke="#059669" strokeDasharray="3" />
+                  </g>
+                )}
+              </>
+            )}
+
+            {activeTab === 'sphere' && (
+              <>
+                {renderCylinderSkeleton(step >= 2 ? 0.1 : 0.2, 100, 100)}
+                {step === 1 && renderVolumeFill("#94a3b8", 100, 100)}
+                {step >= 2 && (
+                  <g className="animate-in zoom-in duration-700">
+                    <circle cx="100" cy="100" r="50" fill="#f59e0b" fillOpacity="0.7" stroke="#d97706" strokeWidth="2" />
+                    <ellipse cx="100" cy="100" rx="50" ry="15" fill="none" stroke="#d97706" strokeDasharray="3" opacity="0.6" />
+                  </g>
+                )}
+              </>
+            )}
+          </svg>
+
+          {step === 2 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className={`text-8xl font-black opacity-30 transform ${activeTab === 'cone' ? 'text-emerald-600 -rotate-12' : 'text-amber-600 rotate-12'}`}>
+                {activeTab === 'cone' ? '1/3' : '2/3'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 안내 텍스트 */}
+        <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-100 min-h-[80px] flex items-center justify-center text-center">
+          <p className="text-slate-700 font-medium whitespace-pre-line">
+            {activeTab === 'cylinder' && (step === 0 ? "부피 버튼을 눌러\n밑면이 쌓이는 과정을 보세요." : "밑면(S)이 높이(h)만큼 쌓여\n원기둥의 부피가 됩니다.")}
+            {activeTab === 'cone' && (step === 0 ? "먼저 원기둥의 부피를 가득 채워봅시다." : step === 1 ? (layers < 20 ? "원기둥을 채우는 중..." : "기둥이 다 찼습니다.\n원뿔로 옮겨볼까요?") : "원뿔의 부피는 기둥 부피의 1/3입니다.")}
+            {activeTab === 'sphere' && (step === 0 ? "먼저 구가 꼭 들어가는\n원기둥의 부피를 채워봅시다." : step === 1 ? (layers < 20 ? "원기둥을 채우는 중..." : "기둥이 다 찼습니다.\n구로 옮겨볼까요?") : "구의 부피는 기둥 부피의 2/3입니다.")}
+          </p>
+        </div>
+
+        {/* 하단 컨트롤 */}
+        <div className="mt-6 flex gap-3">
+          <button 
+            onClick={() => {
+              if (step < 2) setStep(step + 1);
+              else setFormulaVisible(true);
+            }}
+            disabled={formulaVisible}
+            className={`flex-1 py-4 rounded-xl font-bold shadow-sm transition-all flex items-center justify-center gap-2 ${
+              formulaVisible ? 'bg-slate-200 text-slate-400 cursor-not-allowed' :
+              activeTab === 'cylinder' ? 'bg-blue-600 text-white hover:bg-blue-700' :
+              activeTab === 'cone' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-amber-600 text-white hover:bg-amber-700'
+            }`}
+          >
+            {step === 0 ? '원기둥 부피 채우기' : step === 1 ? (activeTab === 'cylinder' ? '완료' : '부피 비교하기') : '공식 정리 보기'}
+            <ArrowRight size={18} />
+          </button>
+          
+          <button 
+            onClick={() => {setStep(0); setLayers(0); setFormulaVisible(false);}}
+            className="w-14 h-14 bg-white border-2 border-slate-200 rounded-xl flex items-center justify-center text-slate-600 hover:border-slate-300 transition-colors shadow-sm"
+          >
+            <RotateCcw size={24} />
+          </button>
+        </div>
+      </div>
+
+      {/* 수식 표시부 (분수 모양 개선) */}
+      {formulaVisible && (
+        <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className={`p-6 rounded-2xl border-2 text-center shadow-sm ${
+            activeTab === 'cylinder' ? 'bg-blue-50 border-blue-200 text-blue-900' :
+            activeTab === 'cone' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
+            'bg-amber-50 border-amber-200 text-amber-900'
+          }`}>
+            <h3 className="text-lg font-bold mb-4">
+              {activeTab === 'cylinder' && "원기둥의 부피 정리"}
+              {activeTab === 'cone' && "원뿔의 부피 관계"}
+              {activeTab === 'sphere' && "구의 부피 공식 정리"}
+            </h3>
+            
+            <div className="flex flex-col items-center space-y-3">
+              {activeTab === 'cylinder' && (
+                <>
+                  <div className="text-sm opacity-70">밑넓이(S) × 높이(h)</div>
+                  <div className="text-5xl font-serif italic font-bold">V = πr²h</div>
+                </>
+              )}
+              {activeTab === 'cone' && (
+                <>
+                  <div className="text-sm font-bold text-emerald-700">뿔 부피 = 기둥 부피의 1/3</div>
+                  <div className="flex items-center text-5xl font-serif italic font-bold leading-none">
+                    <span>V =</span>
+                    <Fraction numerator="1" denominator="3" />
+                    <span>πr²h</span>
+                  </div>
+                </>
+              )}
+              {activeTab === 'sphere' && (
+                <>
+                  <div className="text-sm font-bold text-amber-700">구 부피 = 기둥 부피의 2/3</div>
+                  <div className="flex items-center text-5xl font-serif italic font-bold leading-none">
+                    <span>V =</span>
+                    <Fraction numerator="4" denominator="3" />
+                    <span>πr³</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="mt-8 text-center text-slate-400 text-xs pb-8 uppercase tracking-widest">
+        Geometry: Volume Relations
+      </footer>
+    </div>
+  );
+};
+
+export default App;
